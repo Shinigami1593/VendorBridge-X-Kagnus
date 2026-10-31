@@ -39,7 +39,7 @@ const userName = computed(() => {
 const initials = computed(() => userName.value.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase())
 const photo = computed(() => user.value.photo || user.value.photo_url || user.value.avatar || '')
 const roleLabel = computed(() => roleLabels[auth.role] || auth.role || 'User')
-const items = [
+const items = computed(() => [
   { label: 'Dashboard', to: '/', name: 'dashboard', icon: LayoutDashboard },
   { label: 'Vendors', to: '/vendors', name: 'vendors', icon: Store },
   { label: "RFQ's", to: '/rfqs', name: 'rfqs', icon: ClipboardList },
@@ -49,7 +49,7 @@ const items = [
   { label: 'Invoices', to: '/invoices', name: 'invoices', icon: ReceiptText },
   { label: 'Reports', to: '/reports', name: 'reports', icon: BarChart3 },
   { label: 'Activity', to: '/activity', name: 'activity', icon: Activity },
-]
+].filter((item) => auth.role !== 'vendor' || !['dashboard', 'vendors'].includes(item.name)))
 
 function askToLogout() {
   menuOpen.value = false

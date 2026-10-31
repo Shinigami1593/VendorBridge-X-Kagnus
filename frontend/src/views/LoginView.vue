@@ -18,7 +18,7 @@ async function submit() {
   loading.value = true
   try {
     await auth.login(email.value, password.value)
-    await router.replace('/')
+    await router.replace(auth.role === 'vendor' ? '/rfqs' : '/')
   } catch (err) {
     error.value = getErrorMessage(err, 'Email or password is incorrect.')
   } finally {

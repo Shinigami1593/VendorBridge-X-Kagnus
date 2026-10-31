@@ -377,6 +377,7 @@ textarea:focus-visible {
 .panel {
   min-width: 0;
   padding: 19px;
+  margin-bottom: 20px;
 }
 
 .panel-heading {

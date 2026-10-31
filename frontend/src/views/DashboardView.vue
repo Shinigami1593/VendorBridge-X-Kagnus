@@ -65,7 +65,7 @@ onMounted(loadDashboard)
         <p class="muted">Welcome back, {{ welcome }} - Today's Overview</p>
       </div>
       <div class="quick-actions">
-        <RouterLink class="button button-secondary" to="/rfqs">+ New RFQ</RouterLink>
+        <RouterLink v-if="auth.role !== 'manager'" class="button button-secondary" to="/rfqs/new">+ New RFQ</RouterLink>
         <RouterLink class="button button-primary" to="/vendors?add=1">Add Vendor</RouterLink>
         <RouterLink class="button button-secondary" to="/invoices">View Invoices</RouterLink>
       </div>
