@@ -13,7 +13,7 @@ class VendorSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'category', 'gst_number', 'contact_person',
             'contact_email', 'contact_phone', 'address', 'status',
-            'created_by', 'created_at', 'updated_at',
+            'rating', 'created_by', 'created_at', 'updated_at',
         ]
         read_only_fields = ['created_by', 'created_at', 'updated_at']
         extra_kwargs = {
@@ -36,3 +36,12 @@ class VendorSerializer(serializers.ModelSerializer):
                 'A vendor with this GST number already exists.'
             )
         return value
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            fields['rating'].read_only = True
+        elif request.user.role not in ('admin', 'officer'):
+            fields['rating'].read_only = True
+        return fields

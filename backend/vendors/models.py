@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -18,6 +19,16 @@ class Vendor(models.Model):
     address = models.TextField(blank=True)
     status = models.CharField(
         max_length=10, choices=STATUS_CHOICES, default='pending'
+    )
+    rating = models.DecimalField(
+        max_digits=2,
+        decimal_places=1,
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(5),
+        ],
     )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

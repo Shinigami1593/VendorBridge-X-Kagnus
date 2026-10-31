@@ -1,7 +1,10 @@
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
+from django.utils import timezone
 
+from rfqs.models import RFQ
 from vendors.models import Vendor
+from datetime import timedelta
 
 
 User = get_user_model()
@@ -46,3 +49,29 @@ class DashboardTests(APITestCase):
         self.client.force_authenticate(user=self.vendor_user)
         response = self.client.get('/api/dashboard/')
         self.assertEqual(response.status_code, 403)
+
+    def test_dashboard_counts_open_rfqs_with_future_deadlines(self):
+        RFQ.objects.create(
+            title='Current',
+            category='Office',
+            deadline=timezone.now() + timedelta(days=1),
+            status='open',
+            created_by=self.manager,
+        )
+        RFQ.objects.create(
+            title='Expired',
+            category='Office',
+            deadline=timezone.now() - timedelta(days=1),
+            status='open',
+            created_by=self.manager,
+        )
+        RFQ.objects.create(
+            title='Draft',
+            category='Office',
+            deadline=timezone.now() + timedelta(days=1),
+            status='draft',
+            created_by=self.manager,
+        )
+        self.client.force_authenticate(user=self.manager)
+        response = self.client.get('/api/dashboard/')
+        self.assertEqual(response.data['cards']['active_rfqs'], 1)
