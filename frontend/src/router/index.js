@@ -1,11 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth } from '../stores/auth'
 import AppLayout from '../components/AppLayout.vue'
+import ApprovalDetailView from '../views/ApprovalDetailView.vue'
+import ApprovalListView from '../views/ApprovalListView.vue'
 import ComingSoon from '../views/ComingSoon.vue'
 import DashboardView from '../views/DashboardView.vue'
 import ForgotPasswordView from '../views/ForgotPasswordView.vue'
 import LoginView from '../views/LoginView.vue'
 import NoAccessView from '../views/NoAccessView.vue'
+import InvoiceDetailView from '../views/InvoiceDetailView.vue'
+import InvoiceListView from '../views/InvoiceListView.vue'
+import PurchaseOrderDetailView from '../views/PurchaseOrderDetailView.vue'
+import PurchaseOrderListView from '../views/PurchaseOrderListView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import ResetPasswordView from '../views/ResetPasswordView.vue'
 import QuotationCompareView from '../views/QuotationCompareView.vue'
@@ -19,6 +25,8 @@ import VendorsView from '../views/VendorsView.vue'
 const vendorRoutes = ['vendor']
 const editorRoles = ['admin', 'officer']
 const comparisonRoles = ['admin', 'officer', 'manager']
+const approvalRoles = ['admin', 'officer', 'manager']
+const purchaseOrderRoles = ['admin', 'officer', 'manager', 'vendor']
 
 const router = createRouter({
   history: createWebHistory(),
@@ -42,9 +50,12 @@ const router = createRouter({
         { path: 'rfqs/:id/quote', name: 'rfq-quote', component: QuotationFormView, meta: { allowedRoles: vendorRoutes } },
         { path: 'rfqs/:id/compare', name: 'rfq-compare', component: QuotationCompareView, meta: { allowedRoles: comparisonRoles } },
         { path: 'quotations', name: 'quotations', component: QuotationsView },
-        { path: 'approvals', name: 'approvals', component: ComingSoon, meta: { title: 'Approvals' } },
-        { path: 'purchase-orders', name: 'purchase-orders', component: ComingSoon, meta: { title: 'Purchase orders' } },
-        { path: 'invoices', name: 'invoices', component: ComingSoon, meta: { title: 'Invoices' } },
+        { path: 'approvals', name: 'approvals', component: ApprovalListView, meta: { allowedRoles: approvalRoles } },
+        { path: 'approvals/:id', name: 'approval-detail', component: ApprovalDetailView, meta: { allowedRoles: approvalRoles } },
+        { path: 'purchase-orders', name: 'purchase-orders', component: PurchaseOrderListView, meta: { allowedRoles: purchaseOrderRoles } },
+        { path: 'purchase-orders/:id', name: 'purchase-order-detail', component: PurchaseOrderDetailView, meta: { allowedRoles: purchaseOrderRoles } },
+        { path: 'invoices', name: 'invoices', component: InvoiceListView, meta: { allowedRoles: purchaseOrderRoles } },
+        { path: 'invoices/:id', name: 'invoice-detail', component: InvoiceDetailView, meta: { allowedRoles: purchaseOrderRoles } },
         { path: 'reports', name: 'reports', component: ComingSoon, meta: { title: 'Reports' } },
         { path: 'activity', name: 'activity', component: ComingSoon, meta: { title: 'Activity' } },
       ],

@@ -44,6 +44,10 @@ const vendors = computed(() => (rfq.value?.vendors || []).map((vendor) => {
   return `Vendor ${vendor}`
 }))
 const quotations = computed(() => rfq.value?.quotations || rfq.value?.received_quotations || [])
+const approval = computed(() => rfq.value?.approval || {})
+const approvalId = computed(() => rfq.value?.approval_id || approval.value.id)
+const purchaseOrderId = computed(() => rfq.value?.po_id || rfq.value?.purchase_order_id || approval.value.po_id)
+const approvalStatus = computed(() => rfq.value?.approval_status || approval.value.status || '')
 
 async function loadRfq() {
   loading.value = true
@@ -95,6 +99,7 @@ onMounted(loadRfq)
           <div class="rfq-detail-status">
             <StatusBadge :status="String(rfq.display_status || rfq.status || 'unknown')" />
             <span class="muted">Deadline {{ formatDate(rfq.deadline) }} · {{ deadlineNote }}</span>
+            <StatusBadge v-if="approvalStatus" :status="String(approvalStatus)" />
           </div>
         </div>
         <div class="rfq-detail-actions">
@@ -103,6 +108,8 @@ onMounted(loadRfq)
             {{ sending ? 'Sending…' : 'Send to Vendors' }}
           </button>
           <RouterLink v-if="canCompare" class="button button-secondary" :to="`/rfqs/${rfq.id}/compare`">Compare Quotations</RouterLink>
+          <RouterLink v-if="approvalId && !isVendor" class="button button-secondary" :to="`/approvals/${approvalId}`">View Approval</RouterLink>
+          <RouterLink v-if="purchaseOrderId" class="button button-secondary" :to="`/purchase-orders/${purchaseOrderId}`">View Purchase Order</RouterLink>
           <button v-if="isVendor" class="button button-primary" type="button" :disabled="deadlinePassed" @click="openQuote">
             {{ quotationAction }}
           </button>

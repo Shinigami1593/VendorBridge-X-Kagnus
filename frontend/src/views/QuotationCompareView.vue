@@ -23,6 +23,7 @@ let filterTimer
 
 const canSelect = computed(() => ['admin', 'officer'].includes(auth.role))
 const selectedId = computed(() => rfq.value?.selected_quotation_id || rfq.value?.selected_quotation?.id || rfq.value?.selected_quotation || null)
+const approvalId = computed(() => rfq.value?.approval_id || rfq.value?.approval?.id || null)
 
 function getRows(data) {
   if (Array.isArray(data)) return data
@@ -127,6 +128,9 @@ onUnmounted(() => clearTimeout(filterTimer))
 
     <p v-if="error" class="form-error page-alert" role="alert">{{ error }}</p>
     <p v-if="success" class="success-message page-alert" role="status">{{ success }}</p>
+    <RouterLink v-if="success && approvalId" class="button button-primary comparison-approval-link" :to="`/approvals/${approvalId}`">
+      Go to Approval
+    </RouterLink>
     <p v-if="loading" class="loading-message" role="status">Loading comparison…</p>
     <section v-else-if="quotations.length" class="panel quotation-comparison-panel">
       <div class="table-wrap">

@@ -49,7 +49,11 @@ const items = computed(() => [
   { label: 'Invoices', to: '/invoices', name: 'invoices', icon: ReceiptText },
   { label: 'Reports', to: '/reports', name: 'reports', icon: BarChart3 },
   { label: 'Activity', to: '/activity', name: 'activity', icon: Activity },
-].filter((item) => auth.role !== 'vendor' || !['dashboard', 'vendors'].includes(item.name)))
+].filter((item) => auth.role !== 'vendor' || ['rfqs', 'quotations', 'purchase-orders', 'invoices'].includes(item.name)))
+
+function isActive(item) {
+  return route.name === item.name || (item.to !== '/' && route.path.startsWith(`${item.to}/`))
+}
 
 function askToLogout() {
   menuOpen.value = false
@@ -102,7 +106,7 @@ async function confirmLogout() {
             :key="item.name"
             :to="item.to"
             class="nav-item"
-            :class="{ 'nav-active': route.name === item.name }"
+            :class="{ 'nav-active': isActive(item) }"
             @click="menuOpen = false"
           >
             <component :is="item.icon" :size="17" :stroke-width="1.8" aria-hidden="true" />
