@@ -14,6 +14,8 @@ class RFQ(models.Model):
         ('open', 'Open'),
         ('closed', 'Closed'),
         ('selected', 'Selected'),
+        ('approved', 'Approved'),
+        ('ordered', 'Ordered'),
     ]
 
     rfq_number = models.CharField(max_length=20, unique=True, blank=True)

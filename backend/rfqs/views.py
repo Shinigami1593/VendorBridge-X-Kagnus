@@ -2,6 +2,7 @@ import math
 from pathlib import Path
 
 from django.db.models import Q
+from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
@@ -154,25 +155,41 @@ class RFQViewSet(viewsets.ModelViewSet):
         rfq = self.get_object()
         serializer = SelectQuotationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if rfq.status not in ('open', 'closed'):
-            raise ValidationError(
-                {'status': 'Quotation can only be selected for an open or closed RFQ.'}
+        from approvals.models import Approval
+
+        with transaction.atomic():
+            rfq = RFQ.objects.select_for_update().get(pk=rfq.pk)
+            if Approval.objects.filter(
+                rfq=rfq, status__in=('pending', 'approved')
+            ).exists():
+                raise ValidationError(
+                    {'error': 'This RFQ already has a pending or approved approval.'}
+                )
+            if rfq.status not in ('open', 'closed'):
+                raise ValidationError(
+                    {'status': 'Quotation can only be selected for an open or closed RFQ.'}
+                )
+            try:
+                quotation = Quotation.objects.get(
+                    pk=serializer.validated_data['quotation_id'], rfq=rfq
+                )
+            except Quotation.DoesNotExist:
+                raise ValidationError(
+                    {'quotation_id': 'Quotation does not belong to this RFQ.'}
+                )
+            if quotation.status != 'submitted':
+                raise ValidationError(
+                    {'quotation_id': 'Only submitted quotations can be selected.'}
+                )
+            rfq.selected_quotation = quotation
+            rfq.status = 'selected'
+            rfq.save(update_fields=['selected_quotation', 'status', 'updated_at'])
+            Approval.objects.create(
+                rfq=rfq,
+                quotation=quotation,
+                requested_by=request.user,
             )
-        try:
-            quotation = Quotation.objects.get(
-                pk=serializer.validated_data['quotation_id'], rfq=rfq
-            )
-        except Quotation.DoesNotExist:
-            raise ValidationError(
-                {'quotation_id': 'Quotation does not belong to this RFQ.'}
-            )
-        if quotation.status != 'submitted':
-            raise ValidationError(
-                {'quotation_id': 'Only submitted quotations can be selected.'}
-            )
-        rfq.selected_quotation = quotation
-        rfq.status = 'selected'
-        rfq.save(update_fields=['selected_quotation', 'status', 'updated_at'])
+            rfq.refresh_from_db()
         return Response(self.get_serializer(rfq).data)
 
     @action(detail=True, methods=['get', 'put'], url_path='my-quotation')

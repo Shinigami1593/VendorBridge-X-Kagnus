@@ -49,6 +49,9 @@ INSTALLED_APPS = [
     'vendors',
     'rfqs',
     'dashboard',
+    'approvals',
+    'purchase_orders',
+    'invoices',
 ]
 
 MIDDLEWARE = [
@@ -148,10 +151,27 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+if os.getenv('EMAIL_HOST'):
+    MAILERS['default'] = {
+        'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+        'OPTIONS': {
+            'host': os.environ['EMAIL_HOST'],
+            'port': int(os.getenv('EMAIL_PORT', '25')),
+            'use_tls': os.getenv('EMAIL_USE_TLS', '').lower() in ('true', '1', 'yes'),
+            'username': os.getenv('EMAIL_HOST_USER', ''),
+            'password': os.getenv('EMAIL_HOST_PASSWORD', ''),
+        },
+    }
+
+APPROVAL_LEVELS = 2
+ORG_NAME = os.getenv('ORG_NAME', 'Your Organization Name')
+ORG_ADDRESS = os.getenv('ORG_ADDRESS', '123 Business Park, Ahmedabad')
+ORG_GSTIN = os.getenv('ORG_GSTIN', '25383438AFB')
+INVOICE_DUE_DAYS = 30
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 # EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
-DEFAULT_FROM_EMAIL = "noreply@vendorbridge.com"
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@vendorbridge.com')

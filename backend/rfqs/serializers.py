@@ -33,6 +33,9 @@ class RFQSerializer(serializers.ModelSerializer):
     display_status = serializers.SerializerMethodField()
     quotation_count = serializers.SerializerMethodField()
     my_quotation_status = serializers.SerializerMethodField()
+    approval_id = serializers.SerializerMethodField()
+    approval_status = serializers.SerializerMethodField()
+    po_id = serializers.SerializerMethodField()
 
     class Meta:
         model = RFQ
@@ -40,12 +43,14 @@ class RFQSerializer(serializers.ModelSerializer):
             'id', 'rfq_number', 'title', 'category', 'description',
             'deadline', 'status', 'display_status', 'vendors', 'items',
             'selected_quotation', 'quotation_count', 'my_quotation_status',
-            'created_by', 'created_at', 'updated_at',
+            'approval_id', 'approval_status', 'po_id', 'created_by',
+            'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'rfq_number', 'status', 'selected_quotation', 'created_by',
             'created_at', 'updated_at', 'display_status', 'quotation_count',
             'my_quotation_status',
+            'approval_id', 'approval_status', 'po_id',
         ]
 
     def validate(self, attrs):
@@ -123,6 +128,23 @@ class RFQSerializer(serializers.ModelSerializer):
         return rfq.quotations.filter(vendor=vendor).values_list(
             'status', flat=True
         ).first()
+
+    def _latest_approval(self, rfq):
+        return rfq.approvals.order_by('-created_at').first()
+
+    def get_approval_id(self, rfq):
+        approval = self._latest_approval(rfq)
+        return approval.pk if approval else None
+
+    def get_approval_status(self, rfq):
+        approval = self._latest_approval(rfq)
+        return approval.status if approval else None
+
+    def get_po_id(self, rfq):
+        approval = self._latest_approval(rfq)
+        return getattr(approval, 'purchase_order', None).pk if (
+            approval and hasattr(approval, 'purchase_order')
+        ) else None
 
 
 class RFQAttachmentSerializer(serializers.ModelSerializer):

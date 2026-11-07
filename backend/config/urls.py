@@ -10,6 +10,9 @@ urlpatterns = [
     path('api/auth/', include('accounts.urls')),
     path('api/vendors/', include('vendors.urls')),
     path('api/rfqs/', include('rfqs.urls')),
+    path('api/approvals/', include('approvals.urls')),
+    path('api/purchase-orders/', include('purchase_orders.urls')),
+    path('api/invoices/', include('invoices.urls')),
     path('api/my-quotations/', MyQuotationsView.as_view(), name='my-quotations'),
     path('api/dashboard/', include('dashboard.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
