@@ -15,6 +15,9 @@ urlpatterns = [
     path('api/invoices/', include('invoices.urls')),
     path('api/my-quotations/', MyQuotationsView.as_view(), name='my-quotations'),
     path('api/dashboard/', include('dashboard.urls')),
+    path('api/activity/', include('activity.urls')),
+    path('api/notifications/', include('notifications.urls')),
+    path('api/reports/', include('reports.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 handler500 = 'config.views.server_error'

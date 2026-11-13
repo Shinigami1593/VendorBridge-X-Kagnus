@@ -5,10 +5,12 @@ import api from '../api'
 import EmptyState from '../components/EmptyState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useAuth } from '../stores/auth'
+import { useNotifications } from '../stores/notifications'
 import { getErrorMessage } from '../utils/errors'
 import { formatDate, formatMoney } from '../utils/format'
 
 const auth = useAuth()
+const notifications = useNotifications()
 const route = useRoute()
 const router = useRouter()
 const order = ref(null)
@@ -48,6 +50,10 @@ async function generateInvoice() {
   error.value = ''
   try {
     const response = await api.post('/invoices/', { purchase_order_id: order.value.id })
+    await loadOrder()
+    await notifications.fetchUnreadCount().catch((refreshError) => {
+      error.value = getErrorMessage(refreshError, 'Invoice created, but notifications could not be refreshed.')
+    })
     const id = response.data?.id || response.data?.invoice?.id
     if (!id) {
       error.value = 'The invoice was created, but its ID was not returned.'

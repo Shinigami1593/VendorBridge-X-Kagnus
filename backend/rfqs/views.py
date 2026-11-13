@@ -2,6 +2,7 @@ import math
 from pathlib import Path
 
 from django.db.models import Q
+from django.db.models.functions import Lower
 from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -11,6 +12,9 @@ from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from activity.utils import log
+from accounts.models import User
+from notifications.utils import notify
 from vendors.utils import get_vendor_for_user
 from .models import Quotation, RFQ, RFQAttachment
 from .serializers import (
@@ -69,14 +73,22 @@ class RFQViewSet(viewsets.ModelViewSet):
         return rfqs.distinct()
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        rfq = serializer.save(created_by=self.request.user)
+        log(
+            self.request.user, 'rfq', 'rfq_created',
+            f'RFQ created - {rfq.title}', rfq,
+        )
 
     def perform_update(self, serializer):
         if self.get_object().status not in ('draft', 'open'):
             raise ValidationError(
                 {'status': 'Only draft or open RFQs can be updated.'}
             )
-        serializer.save()
+        rfq = serializer.save()
+        log(
+            self.request.user, 'rfq', 'rfq_updated',
+            f'RFQ updated - {rfq.title}', rfq,
+        )
 
     def perform_destroy(self, instance):
         if instance.status != 'draft':
@@ -109,6 +121,22 @@ class RFQViewSet(viewsets.ModelViewSet):
             raise ValidationError(errors)
         rfq.status = 'open'
         rfq.save(update_fields=['status', 'updated_at'])
+        log(
+            request.user, 'rfq', 'rfq_published',
+            f'RFQ published - {rfq.title}', rfq,
+        )
+        vendor_emails = rfq.vendors.annotate(
+            email_key=Lower('contact_email')
+        ).values('email_key')
+        vendor_users = User.objects.annotate(
+            email_key=Lower('email')
+        ).filter(role='vendor', email_key__in=vendor_emails).exclude(
+            pk=request.user.pk
+        )
+        notify(
+            vendor_users, 'rfq', 'New RFQ assigned',
+            f'New RFQ assigned - {rfq.title}', rfq, f'/rfqs/{rfq.pk}',
+        )
         return Response(self.get_serializer(rfq).data)
 
     @action(
@@ -184,10 +212,28 @@ class RFQViewSet(viewsets.ModelViewSet):
             rfq.selected_quotation = quotation
             rfq.status = 'selected'
             rfq.save(update_fields=['selected_quotation', 'status', 'updated_at'])
-            Approval.objects.create(
+            approval = Approval.objects.create(
                 rfq=rfq,
                 quotation=quotation,
                 requested_by=request.user,
+            )
+            log(
+                request.user, 'quotation', 'quotation_selected',
+                f'Quotation selected - {quotation.vendor.name} selected for {rfq.title}',
+                quotation,
+            )
+            log(
+                request.user, 'approval', 'approval_requested',
+                f'Approval requested - {quotation.vendor.name} for {rfq.title}',
+                approval,
+            )
+            approvers = User.objects.filter(
+                role__in=('manager', 'admin')
+            ).exclude(pk=request.user.pk)
+            notify(
+                approvers, 'approval', 'Approval needed',
+                f'Approval needed - {quotation.vendor.name} for {rfq.title}',
+                approval, f'/approvals/{approval.pk}',
             )
             rfq.refresh_from_db()
         return Response(self.get_serializer(rfq).data)
@@ -215,9 +261,22 @@ class RFQViewSet(viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         created = quotation is None
+        previous_status = quotation.status if quotation else None
         quotation = serializer.save(
             rfq=rfq, vendor=vendor, quotation=quotation
         )
+        if quotation.status == 'submitted' and previous_status != 'submitted':
+            log(
+                request.user, 'quotation', 'quotation_submitted',
+                f'Quotation submitted - {vendor.name} for {rfq.title}',
+                quotation,
+            )
+            notify(
+                [rfq.created_by] if rfq.created_by_id != request.user.pk else [],
+                'rfq', 'Quotation received',
+                f'Quotation received - {vendor.name} for {rfq.title}',
+                quotation, f'/rfqs/{rfq.pk}',
+            )
         return Response(
             QuotationSerializer(quotation).data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,

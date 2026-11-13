@@ -8,7 +8,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from activity.utils import log
 from approvals.models import Approval
+from accounts.models import User
+from notifications.utils import notify
 from vendors.utils import get_vendor_for_user
 from .models import POItem, PurchaseOrder, PurchaseOrderCounter
 
@@ -151,6 +154,19 @@ class PurchaseOrderListCreateView(APIView):
             ])
             approval.rfq.status = 'ordered'
             approval.rfq.save(update_fields=['status', 'updated_at'])
+            log(
+                request.user, 'po', 'po_generated',
+                f'Purchase order generated - {po.po_number} for {vendor.name}',
+                po,
+            )
+            vendor_users = User.objects.filter(
+                role='vendor', email__iexact=vendor.contact_email,
+            ).exclude(pk=request.user.pk)
+            notify(
+                vendor_users, 'po', 'Purchase order issued',
+                f'Purchase order issued - {po.po_number}', po,
+                f'/purchase-orders/{po.pk}',
+            )
         return Response(po_detail(po), status=201)
 
 

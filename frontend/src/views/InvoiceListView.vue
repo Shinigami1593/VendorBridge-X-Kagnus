@@ -25,22 +25,6 @@ function getRows(data) {
   return Array.isArray(data?.results) ? data.results : []
 }
 
-function statusLabel(value) {
-  const normalized = String(value || '').toLowerCase()
-  if (normalized === 'pending_payment') return 'Pending Payment'
-  if (normalized === 'paid') return 'Paid'
-  return value || 'unknown'
-}
-
-function isOverdue(invoice) {
-  const invoiceStatus = String(invoice.status || '').toLowerCase()
-  const dueDate = new Date(invoice.due_date)
-  return ['pending', 'pending_payment'].includes(invoiceStatus)
-    && invoice.due_date
-    && !Number.isNaN(dueDate.getTime())
-    && dueDate.getTime() < new Date().setHours(0, 0, 0, 0)
-}
-
 async function loadInvoices() {
   loading.value = true
   error.value = ''
@@ -127,11 +111,8 @@ onUnmounted(() => clearTimeout(searchTimer))
               <td>{{ invoice.po_number || invoice.purchase_order?.po_number || '—' }}</td>
               <td>{{ invoice.vendor_name || invoice.vendor?.name || '—' }}</td>
               <td>{{ formatMoney(invoice.grand_total ?? invoice.total) }}</td>
-              <td>
-                {{ formatDate(invoice.due_date) }}
-                <span v-if="isOverdue(invoice)" class="overdue-label">Overdue</span>
-              </td>
-              <td><StatusBadge :status="statusLabel(invoice.status)" /></td>
+              <td>{{ formatDate(invoice.due_date) }}</td>
+              <td><StatusBadge :status="String(invoice.status || 'unknown')" /></td>
             </tr>
           </tbody>
         </table>
@@ -162,14 +143,4 @@ onUnmounted(() => clearTimeout(searchTimer))
   outline-offset: -2px;
 }
 
-.overdue-label {
-  display: inline-flex;
-  margin-left: 7px;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: var(--red-soft);
-  color: var(--red);
-  font-size: 9px;
-  font-weight: 600;
-}
 </style>

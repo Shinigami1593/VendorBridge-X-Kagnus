@@ -3,10 +3,12 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../api'
 import EmptyState from '../components/EmptyState.vue'
+import { useNotifications } from '../stores/notifications'
 import { getErrorMessage, getFieldErrors } from '../utils/errors'
 
 const route = useRoute()
 const router = useRouter()
+const notifications = useNotifications()
 const rfqId = ref(route.params.id || '')
 const status = ref('draft')
 const quotationCount = ref(0)
@@ -216,7 +218,12 @@ async function save(send = false) {
     rfqId.value = response.data.id || rfqId.value
     if (!rfqId.value) throw new Error('The saved RFQ did not include an ID.')
     await uploadAttachments()
-    if (send) await api.post(`/rfqs/${rfqId.value}/publish/`)
+    if (send) {
+      await api.post(`/rfqs/${rfqId.value}/publish/`)
+      await notifications.fetchUnreadCount().catch((refreshError) => {
+        error.value = getErrorMessage(refreshError, 'RFQ sent, but notifications could not be refreshed.')
+      })
+    }
     await router.push(`/rfqs/${rfqId.value}`)
   } catch (err) {
     fieldErrors.value = getFieldErrors(err)

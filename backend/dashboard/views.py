@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import IsAdminOrOfficerOrManager
+from notifications.models import Notification
 from rfqs.models import RFQ
 from approvals.models import Approval
 from invoices.models import Invoice
@@ -62,6 +63,9 @@ class DashboardView(APIView):
                 ).count(),
                 'total_vendors': vendors.count(),
                 'active_vendors': vendors.filter(status='active').count(),
+                'unread_notifications': Notification.objects.filter(
+                    user=request.user, is_read=False
+                ).count(),
             },
             'recent_purchase_orders': [{
                 'po_number': po.po_number,

@@ -6,6 +6,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from activity.models import ActivityLog
+from notifications.models import Notification
 from vendors.models import Vendor
 from .models import Quotation, RFQ, RFQItem
 
@@ -114,6 +116,10 @@ class RFQTests(APITestCase):
         self.assertTrue(first.data['rfq_number'].startswith('RFQ-'))
         self.assertNotEqual(first.data['rfq_number'], second.data['rfq_number'])
         self.assertEqual(len(first.data['items']), 2)
+        events = ActivityLog.objects.filter(action='rfq_created').order_by('pk')
+        self.assertEqual(events.count(), 2)
+        self.assertEqual(events.first().actor, self.officer)
+        self.assertEqual(events.first().object_id, first.data['id'])
 
     def test_manager_and_vendor_cannot_create_rfq(self):
         for user in (self.manager, self.vendor_user):
@@ -169,6 +175,9 @@ class RFQTests(APITestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(rfq.items.count(), 1)
+        event = ActivityLog.objects.get(action='rfq_updated')
+        self.assertEqual(event.actor, self.officer)
+        self.assertEqual(event.object_id, rfq.pk)
         rfq.refresh_from_db()
         self.assertEqual(
             list(rfq.items.values_list('name', flat=True)), ['New item']
@@ -200,6 +209,12 @@ class RFQTests(APITestCase):
         response = self.client.post(f'/api/rfqs/{rfq.pk}/publish/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['status'], 'open')
+        self.assertEqual(
+            ActivityLog.objects.filter(
+                action='rfq_published', object_id=rfq.pk
+            ).count(),
+            1,
+        )
         response = self.client.post(f'/api/rfqs/{expired.pk}/publish/')
         self.assertEqual(response.status_code, 400)
         self.assertIn('deadline', response.data)
@@ -236,6 +251,18 @@ class RFQTests(APITestCase):
         self.assertEqual(Decimal(response.data['subtotal']), Decimal('35.00'))
         self.assertEqual(Decimal(response.data['tax_amount']), Decimal('6.30'))
         self.assertEqual(Decimal(response.data['grand_total']), Decimal('41.30'))
+        event = ActivityLog.objects.get(action='quotation_submitted')
+        self.assertEqual(event.actor, self.vendor_user)
+        self.assertEqual(event.object_id, response.data['id'])
+        self.assertEqual(
+            Notification.objects.filter(
+                user=self.officer, title='Quotation received'
+            ).count(),
+            1,
+        )
+        self.assertFalse(Notification.objects.filter(
+            user=self.vendor_user, title='Quotation received'
+        ).exists())
 
     def test_vendor_cannot_quote_unassigned_rfq(self):
         rfq = self.create_rfq(vendors=[self.other_vendor])

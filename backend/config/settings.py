@@ -52,6 +52,9 @@ INSTALLED_APPS = [
     'approvals',
     'purchase_orders',
     'invoices',
+    'activity',
+    'notifications',
+    'reports',
 ]
 
 MIDDLEWARE = [

@@ -5,7 +5,9 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from activity.models import ActivityLog
 from approvals.models import Approval
+from notifications.models import Notification
 from purchase_orders.models import POItem, PurchaseOrder
 from rfqs.models import Quotation, QuotationItem, RFQ, RFQItem
 from vendors.models import Vendor
@@ -80,6 +82,19 @@ class PurchaseOrderTests(APITestCase):
         self.assertEqual(response.data['grand_total'], Decimal('23.60'))
         self.assertEqual(POItem.objects.get().total, Decimal('20.00'))
         self.assertEqual(self.create_po().status_code, 400)
+        self.assertEqual(
+            ActivityLog.objects.filter(action='po_generated').count(), 1
+        )
+        self.assertEqual(
+            ActivityLog.objects.get(action='po_generated').object_id,
+            response.data['id'],
+        )
+        self.assertEqual(
+            Notification.objects.filter(
+                user=self.vendor_user, title='Purchase order issued'
+            ).count(),
+            1,
+        )
         self.approval.rfq.refresh_from_db()
         self.assertEqual(self.approval.rfq.status, 'ordered')
 

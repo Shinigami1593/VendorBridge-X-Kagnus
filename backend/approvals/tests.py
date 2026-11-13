@@ -5,7 +5,9 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from activity.models import ActivityLog
 from approvals.models import Approval, ApprovalStep
+from notifications.models import Notification
 from rfqs.models import Quotation, QuotationItem, RFQ, RFQItem
 from vendors.models import Vendor
 
@@ -74,6 +76,18 @@ class ApprovalTests(APITestCase):
             list(approval.steps.values_list('status', flat=True)),
             ['pending', 'waiting'],
         )
+        self.assertEqual(
+            ActivityLog.objects.filter(action='quotation_selected').count(), 1
+        )
+        self.assertEqual(
+            ActivityLog.objects.filter(action='approval_requested').count(), 1
+        )
+        self.assertFalse(
+            Notification.objects.filter(user=self.officer).exists()
+        )
+        self.assertEqual(
+            Notification.objects.filter(title='Approval needed').count(), 2
+        )
 
     def test_officer_and_vendor_cannot_decide_but_manager_can(self):
         approval = self.select()
@@ -95,6 +109,10 @@ class ApprovalTests(APITestCase):
         self.assertEqual(approval.status, 'rejected')
         self.assertEqual(self.rfq.status, 'open')
         self.assertIsNone(self.rfq.selected_quotation_id)
+        event = ActivityLog.objects.get(action='approval_rejected')
+        self.assertIn('Price too high', event.message)
+        self.assertEqual(event.actor, self.manager)
+        self.assertTrue(Notification.objects.filter(user=self.officer).exists())
 
     def test_same_manager_cannot_decide_both_levels_and_second_manager_can(self):
         approval = self.select()
@@ -109,6 +127,10 @@ class ApprovalTests(APITestCase):
         self.assertTrue(all(
             step.status == 'approved' for step in approval.steps.all()
         ))
+        self.assertEqual(
+            ActivityLog.objects.filter(action='approval_level_approved').count(),
+            2,
+        )
 
     def test_pending_or_approved_approval_prevents_reselection(self):
         self.select()

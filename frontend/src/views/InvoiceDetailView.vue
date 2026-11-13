@@ -6,10 +6,12 @@ import BaseModal from '../components/BaseModal.vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useAuth } from '../stores/auth'
+import { useNotifications } from '../stores/notifications'
 import { getErrorMessage } from '../utils/errors'
 import { formatDate, formatDateTime, formatMoney } from '../utils/format'
 
 const auth = useAuth()
+const notifications = useNotifications()
 const route = useRoute()
 const invoice = ref(null)
 const loading = ref(true)
@@ -24,7 +26,6 @@ const success = ref('')
 
 const canManage = computed(() => ['admin', 'officer'].includes(auth.role))
 const status = computed(() => String(invoice.value?.status || '').toLowerCase())
-const isPaid = computed(() => status.value === 'paid')
 const items = computed(() => invoice.value?.items || invoice.value?.line_items || [])
 const vendor = computed(() => invoice.value?.vendor || invoice.value?.purchase_order?.vendor || {})
 const purchaseOrder = computed(() => invoice.value?.purchase_order || {})
@@ -37,12 +38,6 @@ const vendorEmail = computed(() => (
   || vendor.value.contact?.email
   || ''
 ))
-
-function statusLabel(value) {
-  if (String(value).toLowerCase() === 'pending_payment') return 'Pending Payment'
-  if (String(value).toLowerCase() === 'paid') return 'Paid'
-  return value || 'unknown'
-}
 
 function addressText(value) {
   if (typeof value === 'string') return value
@@ -78,20 +73,9 @@ async function downloadPdf() {
     document.body.append(link)
     link.click()
     link.remove()
-    URL.revokeObjectURL(url)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   } catch (err) {
-    const responseData = err.response?.data
-    let message = getErrorMessage(err, 'Unable to download the invoice PDF.')
-    if (responseData instanceof Blob) {
-      const text = await responseData.text()
-      try {
-        const data = JSON.parse(text)
-        message = data.error || data.detail || message
-      } catch {
-        if (text) message = text
-      }
-    }
-    error.value = message
+    error.value = getErrorMessage(err, 'Unable to download the invoice PDF.')
   } finally {
     pdfLoading.value = false
   }
@@ -110,6 +94,9 @@ async function markPaid() {
     await api.post(`/invoices/${route.params.id}/mark-paid/`)
     success.value = 'Invoice marked as paid.'
     await loadInvoice()
+    await notifications.fetchUnreadCount().catch((refreshError) => {
+      error.value = getErrorMessage(refreshError, 'Invoice updated, but notifications could not be refreshed.')
+    })
   } catch (err) {
     error.value = getErrorMessage(err, 'Unable to mark this invoice as paid.')
   } finally {
@@ -140,6 +127,9 @@ async function sendEmail() {
     success.value = `Invoice sent to ${address}`
     emailModal.value = false
     await loadInvoice()
+    await notifications.fetchUnreadCount().catch((refreshError) => {
+      error.value = getErrorMessage(refreshError, 'Invoice sent, but notifications could not be refreshed.')
+    })
   } catch (err) {
     emailError.value = getErrorMessage(err, 'Unable to send the invoice email.')
     try {
@@ -229,7 +219,7 @@ onMounted(loadInvoice)
 
       <div class="invoice-status-line">
         <span>Status:</span>
-        <StatusBadge :status="statusLabel(invoice.status)" :class="{ 'invoice-paid': isPaid, 'invoice-pending': !isPaid }" />
+        <StatusBadge :status="String(invoice.status || 'unknown')" />
         <button
           v-if="canManage && status === 'pending_payment'"
           class="text-link invoice-paid-action"
@@ -330,16 +320,6 @@ onMounted(loadInvoice)
   align-items: center;
   gap: 8px;
   margin: 0 0 18px;
-}
-
-.invoice-pending {
-  background: var(--amber-soft);
-  color: var(--amber);
-}
-
-.invoice-paid {
-  background: var(--green-soft);
-  color: var(--green-dark);
 }
 
 .invoice-paid-action {

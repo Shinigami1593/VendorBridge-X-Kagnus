@@ -6,6 +6,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from activity.utils import log
+from accounts.models import User
+from notifications.utils import notify
 from .models import Approval, ApprovalStep
 
 
@@ -160,6 +163,18 @@ class DecideApprovalView(APIView):
                 approval.rfq.save(update_fields=[
                     'selected_quotation', 'status', 'updated_at'
                 ])
+                log(
+                    request.user, 'approval', 'approval_rejected',
+                    f'Approval rejected - {approval.quotation.vendor.name} for '
+                    f'{approval.rfq.title}. Remarks: {remarks}', approval,
+                )
+                notify(
+                    [approval.requested_by]
+                    if approval.requested_by_id != request.user.pk else [],
+                    'approval', 'Approval rejected',
+                    f'Approval rejected - {approval.rfq.title}. Remarks: {remarks}',
+                    approval, f'/approvals/{approval.pk}',
+                )
             else:
                 next_step = approval.steps.filter(
                     level__gt=approval.current_level
@@ -169,12 +184,40 @@ class DecideApprovalView(APIView):
                     next_step.save(update_fields=['status'])
                     approval.current_level = next_step.level
                     approval.save(update_fields=['current_level'])
+                    log(
+                        request.user, 'approval', 'approval_level_approved',
+                        f'L{step.level} approved - {approval.rfq.title}', approval,
+                    )
+                    notify(
+                        User.objects.filter(role__in=('manager', 'admin'))
+                        .exclude(pk=request.user.pk),
+                        'approval', 'Approval needed',
+                        f'L{next_step.label} needed - {approval.rfq.title}',
+                        approval, f'/approvals/{approval.pk}',
+                    )
                 else:
                     approval.status = 'approved'
                     approval.decided_at = now
                     approval.save(update_fields=['status', 'decided_at'])
                     approval.rfq.status = 'approved'
                     approval.rfq.save(update_fields=['status', 'updated_at'])
+                    log(
+                        request.user, 'approval', 'approval_level_approved',
+                        f'L{step.level} approved - {approval.rfq.title}', approval,
+                    )
+                    recipients = []
+                    if approval.requested_by_id != request.user.pk:
+                        recipients.append(approval.requested_by)
+                    vendor_users = User.objects.filter(
+                        role='vendor',
+                        email__iexact=approval.quotation.vendor.contact_email,
+                    ).exclude(pk=request.user.pk)
+                    notify(
+                        [*recipients, *vendor_users],
+                        'approval', 'Approval completed',
+                        f'Approval completed - {approval.rfq.title}',
+                        approval, f'/approvals/{approval.pk}',
+                    )
         return Response({
             'id': approval.pk,
             'status': approval.status,

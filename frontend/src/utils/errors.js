@@ -1,7 +1,11 @@
 export function getErrorMessage(error, fallback = 'Something went wrong. Please try again.') {
+  const status = error.response?.status
   const data = error.response?.data
-  if (error.response?.status === 403) return 'You do not have permission to do that.'
-  if (error.response?.status === 404) return 'The requested item could not be found.'
+  if (status === 401) return 'Your session has expired. Please sign in again.'
+  if (status === 403) return 'You do not have permission to do that.'
+  if (status === 404) return 'The requested item could not be found.'
+  if (status === 502 || status >= 500) return 'The service is temporarily unavailable. Please try again.'
+  if (!error.response) return 'Unable to connect. Check your internet connection and try again.'
   if (typeof data?.error === 'string') return data.error
   if (typeof data?.detail === 'string') return data.detail
   if (typeof data?.message === 'string') return data.message

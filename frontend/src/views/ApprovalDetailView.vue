@@ -4,10 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { Check, Clock3, X } from 'lucide-vue-next'
 import api from '../api'
 import { useAuth } from '../stores/auth'
+import { useNotifications } from '../stores/notifications'
 import { getErrorMessage } from '../utils/errors'
 import { formatDate, formatDateTime, formatMoney } from '../utils/format'
 
 const auth = useAuth()
+const notifications = useNotifications()
 const route = useRoute()
 const router = useRouter()
 const approval = ref(null)
@@ -135,6 +137,9 @@ async function decide(decision) {
     })
     actionMessage.value = `Approval ${decision}.`
     await loadApproval()
+    await notifications.fetchUnreadCount().catch((refreshError) => {
+      error.value = getErrorMessage(refreshError, 'Approval updated, but notifications could not be refreshed.')
+    })
   } catch (err) {
     error.value = getErrorMessage(err, 'Unable to update this approval.')
   } finally {
@@ -148,6 +153,10 @@ async function generatePurchaseOrder() {
   error.value = ''
   try {
     const response = await api.post('/purchase-orders/', { approval_id: approval.value.id })
+    await loadApproval()
+    await notifications.fetchUnreadCount().catch((refreshError) => {
+      error.value = getErrorMessage(refreshError, 'Purchase order created, but notifications could not be refreshed.')
+    })
     const id = response.data?.id || response.data?.purchase_order?.id
     if (!id) {
       error.value = 'The purchase order was created, but its ID was not returned.'

@@ -3,10 +3,12 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api'
 import EmptyState from '../components/EmptyState.vue'
+import { useNotifications } from '../stores/notifications'
 import { formatDate, formatMoney } from '../utils/format'
 import { getErrorMessage, getFieldErrors } from '../utils/errors'
 
 const route = useRoute()
+const notifications = useNotifications()
 const rfq = ref(null)
 const loading = ref(true)
 const saving = ref(false)
@@ -22,21 +24,14 @@ const form = reactive({
   items: [],
 })
 
-const deadlinePassed = computed(() => {
-  const deadline = rfq.value?.deadline ? new Date(rfq.value.deadline).getTime() : 0
-  return deadline > 0 && deadline < Date.now()
-})
-const subtotalPreview = computed(() => form.items.reduce(
-  (sum, item) => sum + (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0),
-  0,
+const deadlinePassed = computed(() => (
+  String(rfq.value?.display_status || rfq.value?.status || '').toLowerCase() === 'closed'
 ))
-const gstPreview = computed(() => subtotalPreview.value * (Number(form.taxPercent) || 0) / 100)
-const grandTotalPreview = computed(() => subtotalPreview.value + gstPreview.value)
 const snapshot = computed(() => JSON.stringify(form))
 const hasUnsavedChanges = computed(() => snapshot.value !== savedSnapshot.value)
 const displayedTotals = computed(() => serverTotals.value && !hasUnsavedChanges.value
   ? serverTotals.value
-  : { subtotal: subtotalPreview.value, gst: gstPreview.value, grandTotal: grandTotalPreview.value })
+  : null)
 
 function totalFromServer(data) {
   return {
@@ -64,6 +59,7 @@ function quotationData(data) {
       unit: rfqItem.unit,
       unitPrice: savedItem?.unit_price ?? '',
       deliveryDays: savedItem?.delivery_days ?? '',
+      lineTotal: savedItem?.total ?? null,
     }
   })
   const totalFields = ['subtotal', 'gst_amount', 'tax_amount', 'gst', 'grand_total', 'total']
@@ -93,10 +89,6 @@ async function loadPage() {
   }
 }
 
-function itemTotal(item) {
-  return (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0)
-}
-
 async function save(submit) {
   error.value = ''
   success.value = ''
@@ -119,10 +111,13 @@ async function save(submit) {
       })),
     }
     const response = await api.put(`/rfqs/${route.params.id}/my-quotation/`, body)
-    const data = response.data?.quotation || response.data
-    serverTotals.value = totalFromServer(data)
-    savedSnapshot.value = JSON.stringify(form)
+    quotationData(response.data)
     success.value = submit ? 'Quotation submitted successfully.' : 'Quotation draft saved.'
+    if (submit) {
+      await notifications.fetchUnreadCount().catch((refreshError) => {
+        error.value = getErrorMessage(refreshError, 'Quotation submitted, but notifications could not be refreshed.')
+      })
+    }
   } catch (err) {
     fieldErrors.value = getFieldErrors(err)
     error.value = getErrorMessage(err, 'Unable to save the quotation.')
@@ -181,7 +176,7 @@ onMounted(loadPage)
                     >
                     <small v-if="fieldErrors.items" class="field-error">{{ fieldErrors.items }}</small>
                   </td>
-                  <td>{{ formatMoney(itemTotal(item)) }}</td>
+                  <td>{{ item.lineTotal === null || hasUnsavedChanges ? '—' : formatMoney(item.lineTotal) }}</td>
                   <td>
                     <input
                       v-model="item.deliveryDays"
@@ -219,9 +214,12 @@ onMounted(loadPage)
 
           <section class="panel quotation-totals">
             <h2>Totals</h2>
-            <div><span>Subtotal</span><strong>{{ displayedTotals.subtotal === null ? '—' : formatMoney(displayedTotals.subtotal) }}</strong></div>
-            <div><span>GST</span><strong>{{ displayedTotals.gst === null ? '—' : formatMoney(displayedTotals.gst) }}</strong></div>
-            <div class="quotation-grand-total"><span>Grand total</span><strong>{{ displayedTotals.grandTotal === null ? '—' : formatMoney(displayedTotals.grandTotal) }}</strong></div>
+            <template v-if="displayedTotals">
+              <div><span>Subtotal</span><strong>{{ displayedTotals.subtotal === null ? '—' : formatMoney(displayedTotals.subtotal) }}</strong></div>
+              <div><span>GST</span><strong>{{ displayedTotals.gst === null ? '—' : formatMoney(displayedTotals.gst) }}</strong></div>
+              <div class="quotation-grand-total"><span>Grand total</span><strong>{{ displayedTotals.grandTotal === null ? '—' : formatMoney(displayedTotals.grandTotal) }}</strong></div>
+            </template>
+            <p v-else class="muted">Save to view totals calculated by the server.</p>
           </section>
         </div>
 

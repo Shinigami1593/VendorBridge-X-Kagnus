@@ -14,6 +14,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from activity.utils import log
+from accounts.models import User
+from notifications.utils import notify
 from purchase_orders.models import PurchaseOrder
 from vendors.utils import get_vendor_for_user
 from .models import Invoice, InvoiceCounter, InvoiceEmail, InvoiceItem
@@ -173,6 +176,19 @@ class InvoiceListCreateView(APIView):
         invoice = Invoice.objects.select_related(
             'purchase_order__vendor'
         ).prefetch_related('items', 'emails__sent_by').get(pk=invoice.pk)
+        log(
+            request.user, 'invoice', 'invoice_created',
+            f'Invoice created - {invoice.invoice_number}', invoice,
+        )
+        vendor_users = User.objects.filter(
+            role='vendor',
+            email__iexact=invoice.purchase_order.vendor.contact_email,
+        ).exclude(pk=request.user.pk)
+        notify(
+            vendor_users, 'invoice', 'Invoice created',
+            f'Invoice created - {invoice.invoice_number}', invoice,
+            f'/invoices/{invoice.pk}',
+        )
         return Response(invoice_detail(invoice), status=201)
 
 
@@ -218,6 +234,22 @@ class InvoiceMarkPaidView(APIView):
             invoice.status = 'paid'
             invoice.paid_at = timezone.now()
             invoice.save(update_fields=['status', 'paid_at'])
+        log(
+            request.user, 'invoice', 'invoice_marked_paid',
+            f'Invoice marked paid - {invoice.invoice_number}', invoice,
+        )
+        recipients = []
+        if invoice.created_by_id != request.user.pk:
+            recipients.append(invoice.created_by)
+        vendor_users = User.objects.filter(
+            role='vendor',
+            email__iexact=invoice.purchase_order.vendor.contact_email,
+        ).exclude(pk=request.user.pk)
+        notify(
+            [*recipients, *vendor_users], 'invoice', 'Invoice paid',
+            f'Invoice marked paid - {invoice.invoice_number}', invoice,
+            f'/invoices/{invoice.pk}',
+        )
         return Response({'id': invoice.pk, 'status': invoice.status, 'paid_at': invoice.paid_at})
 
 
@@ -296,6 +328,18 @@ class InvoiceSendEmailView(APIView):
                 error=error,
                 sent_by=request.user,
             )
+            log(
+                request.user, 'invoice', 'invoice_emailed',
+                f'Invoice email failed - {invoice.invoice_number} to {to_email}',
+                invoice,
+            )
+            notify(
+                [invoice.created_by]
+                if invoice.created_by_id != request.user.pk else [],
+                'invoice', 'Invoice email failed',
+                f'Invoice email failed - {invoice.invoice_number}',
+                invoice, f'/invoices/{invoice.pk}',
+            )
             return Response(
                 {'status': 'failed', 'error': error[:160]}, status=502
             )
@@ -304,5 +348,16 @@ class InvoiceSendEmailView(APIView):
             to_email=to_email,
             status='sent',
             sent_by=request.user,
+        )
+        log(
+            request.user, 'invoice', 'invoice_emailed',
+            f'Invoice emailed - {invoice.invoice_number} to {to_email}', invoice,
+        )
+        notify(
+            [invoice.created_by]
+            if invoice.created_by_id != request.user.pk else [],
+            'invoice', 'Invoice emailed',
+            f'Invoice emailed - {invoice.invoice_number}',
+            invoice, f'/invoices/{invoice.pk}',
         )
         return Response({'status': 'sent', 'to': to_email})

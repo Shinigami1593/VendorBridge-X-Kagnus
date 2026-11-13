@@ -5,10 +5,12 @@ import api from '../api'
 import EmptyState from '../components/EmptyState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useAuth } from '../stores/auth'
+import { useNotifications } from '../stores/notifications'
 import { formatMoney } from '../utils/format'
 import { getErrorMessage } from '../utils/errors'
 
 const auth = useAuth()
+const notifications = useNotifications()
 const route = useRoute()
 const rfq = ref(null)
 const quotations = ref([])
@@ -86,6 +88,9 @@ async function selectQuotation(quotation) {
     await api.post(`/rfqs/${route.params.id}/select-quotation/`, { quotation_id: quotation.id })
     success.value = 'Quotation selected.'
     await loadComparison()
+    await notifications.fetchUnreadCount().catch((refreshError) => {
+      error.value = getErrorMessage(refreshError, 'Quotation selected, but notifications could not be refreshed.')
+    })
   } catch (err) {
     error.value = getErrorMessage(err, 'Unable to select this quotation.')
   } finally {

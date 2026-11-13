@@ -681,7 +681,28 @@ tbody tr:last-child td {
   color: #267346;
 }
 
+.status-open,
+.status-approved,
+.status-paid,
+.status-selected,
+.status-ordered,
+.status-issued,
+.status-invoiced,
+.status-fulfilled,
+.status-submitted {
+  background: #e9f5ed;
+  color: #267346;
+}
+
 .status-pending {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.status-pending-payment,
+.status-waiting,
+.status-in-review,
+.status-partially-fulfilled {
   background: var(--amber-soft);
   color: var(--amber);
 }
@@ -689,6 +710,21 @@ tbody tr:last-child td {
 .status-blocked {
   background: var(--red-soft);
   color: var(--red);
+}
+
+.status-rejected,
+.status-failed,
+.status-overdue,
+.status-cancelled {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.status-draft,
+.status-closed,
+.status-unknown {
+  background: #f0f2f0;
+  color: #59645c;
 }
 
 .form-stack {
@@ -1287,5 +1323,181 @@ tbody tr:last-child td {
 
   .modal-actions .button {
     flex: 1;
+  }
+}
+
+.notification-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.notification-bell {
+  position: relative;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #f3f6f3;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
+.notification-count {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  place-items: center;
+  padding: 0 4px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #c83d3d;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.notification-dropdown {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 12px);
+  right: 0;
+  width: min(360px, calc(100vw - 28px));
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 12px 35px rgb(17 24 39 / 14%);
+}
+
+.notification-dropdown-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 15px;
+  border-bottom: 1px solid var(--border);
+}
+
+.notification-dropdown-heading strong {
+  font-size: 12px;
+}
+
+.notification-mark-all,
+.notification-view-all {
+  border: 0;
+  background: transparent;
+  color: var(--green-dark);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.notification-mark-all:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.notification-latest-list {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.notification-latest-list li + li {
+  border-top: 1px solid #edf0ed;
+}
+
+.notification-latest-item {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 15px;
+  border: 0;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.notification-latest-item:hover,
+.notification-latest-item.notification-unread {
+  background: #f7faf7;
+}
+
+.notification-unread-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.notification-dot-hidden {
+  visibility: hidden;
+}
+
+.notification-latest-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.notification-latest-copy strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.notification-latest-copy > span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.notification-latest-copy small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.notification-feedback {
+  padding: 14px 15px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.notification-view-all {
+  display: block;
+  padding: 12px 15px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.not-found {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
+.not-found h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+@media (max-width: 560px) {
+  .notification-dropdown {
+    right: -45px;
   }
 }

@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Count, Q
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -9,6 +10,7 @@ from accounts.permissions import (
     IsAdminOrOfficer,
     IsAdminOrOfficerOrManager,
 )
+from activity.utils import log
 from .models import Vendor
 from .serializers import VendorSerializer
 
@@ -40,7 +42,35 @@ class VendorViewSet(viewsets.ModelViewSet):
         return vendors
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        vendor = serializer.save(created_by=self.request.user)
+        log(
+            self.request.user, 'vendor', 'vendor_created',
+            f'Vendor created - {vendor.name}', vendor,
+        )
+
+    def perform_update(self, serializer):
+        old_status = serializer.instance.status
+        vendor = serializer.save()
+        if old_status != vendor.status:
+            log(
+                self.request.user, 'vendor', 'vendor_status_changed',
+                f'Vendor status changed - {vendor.name} is now {vendor.status}',
+                vendor,
+            )
+        else:
+            log(
+                self.request.user, 'vendor', 'vendor_updated',
+                f'Vendor updated - {vendor.name}', vendor,
+            )
+
+    def perform_destroy(self, instance):
+        name = instance.name
+        with transaction.atomic():
+            log(
+                self.request.user, 'vendor', 'vendor_deleted',
+                f'Vendor deleted - {name}', instance,
+            )
+            instance.delete()
 
     @action(detail=False, methods=['get'])
     def stats(self, request):

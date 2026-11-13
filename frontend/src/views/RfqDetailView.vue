@@ -5,10 +5,12 @@ import api from '../api'
 import EmptyState from '../components/EmptyState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useAuth } from '../stores/auth'
+import { useNotifications } from '../stores/notifications'
 import { formatDate, formatMoney } from '../utils/format'
 import { getErrorMessage } from '../utils/errors'
 
 const auth = useAuth()
+const notifications = useNotifications()
 const route = useRoute()
 const router = useRouter()
 const rfq = ref(null)
@@ -20,18 +22,7 @@ const actionMessage = ref('')
 const canManage = computed(() => ['admin', 'officer'].includes(auth.role))
 const canCompare = computed(() => ['admin', 'officer', 'manager'].includes(auth.role))
 const isVendor = computed(() => auth.role === 'vendor')
-const deadlineDate = computed(() => rfq.value?.deadline ? new Date(rfq.value.deadline) : null)
-const deadlinePassed = computed(() => deadlineDate.value && deadlineDate.value.getTime() < Date.now())
-const deadlineNote = computed(() => {
-  if (
-    !deadlineDate.value
-    || Number.isNaN(deadlineDate.value.getTime())
-    || deadlinePassed.value
-    || ['closed', 'selected'].includes(String(rfq.value?.status || '').toLowerCase())
-  ) return 'Closed'
-  const days = Math.max(1, Math.ceil((deadlineDate.value.getTime() - Date.now()) / 86400000))
-  return `${days} days left`
-})
+const deadlinePassed = computed(() => rfq.value?.display_status === 'closed' || rfq.value?.status === 'closed')
 const canEdit = computed(() => canManage.value && ['draft', 'open'].includes(rfq.value?.status))
 const quotationAction = computed(() => {
   const quoteStatus = String(rfq.value?.my_quotation_status || '').toLowerCase()
@@ -70,6 +61,9 @@ async function publishRfq() {
     await api.post(`/rfqs/${route.params.id}/publish/`)
     actionMessage.value = 'RFQ sent to vendors.'
     await loadRfq()
+    await notifications.fetchUnreadCount().catch((refreshError) => {
+      error.value = getErrorMessage(refreshError, 'RFQ sent, but notifications could not be refreshed.')
+    })
   } catch (err) {
     error.value = getErrorMessage(err, 'Unable to send the RFQ to vendors.')
   } finally {
@@ -82,7 +76,7 @@ function openQuote() {
 }
 
 function attachmentUrl(attachment) {
-  return attachment.url || attachment.file_url || attachment.download_url || '#'
+  return attachment.url || attachment.file_url || attachment.download_url || ''
 }
 
 onMounted(loadRfq)
@@ -98,7 +92,7 @@ onMounted(loadRfq)
           <h1>{{ rfq.title }}</h1>
           <div class="rfq-detail-status">
             <StatusBadge :status="String(rfq.display_status || rfq.status || 'unknown')" />
-            <span class="muted">Deadline {{ formatDate(rfq.deadline) }} · {{ deadlineNote }}</span>
+            <span class="muted">Deadline {{ formatDate(rfq.deadline) }}</span>
             <StatusBadge v-if="approvalStatus" :status="String(approvalStatus)" />
           </div>
         </div>
@@ -118,7 +112,7 @@ onMounted(loadRfq)
 
       <p v-if="error" class="form-error page-alert" role="alert">{{ error }}</p>
       <p v-if="actionMessage" class="success-message page-alert" role="status">{{ actionMessage }}</p>
-      <p v-if="isVendor && deadlinePassed" class="form-error page-alert">The deadline has passed. Quotations can no longer be submitted.</p>
+      <p v-if="isVendor && deadlinePassed" class="form-error page-alert">This RFQ is closed. Quotations can no longer be submitted.</p>
 
       <div class="rfq-detail-grid">
         <section class="panel">
@@ -161,9 +155,10 @@ onMounted(loadRfq)
         <div class="panel-heading"><h2>Attachments</h2></div>
         <ul v-if="rfq.attachments?.length" class="rfq-attachment-links">
           <li v-for="attachment in rfq.attachments" :key="attachment.id">
-            <a :href="attachmentUrl(attachment)" target="_blank" rel="noopener noreferrer">
+            <a v-if="attachmentUrl(attachment)" :href="attachmentUrl(attachment)" target="_blank" rel="noopener noreferrer">
               {{ attachment.name || attachment.file_name || attachment.filename || 'Download attachment' }}
             </a>
+            <span v-else>{{ attachment.name || attachment.file_name || attachment.filename || 'Attachment' }}</span>
           </li>
         </ul>
         <EmptyState v-else message="No attachments" />

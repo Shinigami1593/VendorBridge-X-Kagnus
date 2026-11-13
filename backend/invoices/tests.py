@@ -8,7 +8,9 @@ from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from activity.models import ActivityLog
 from invoices.models import Invoice, InvoiceEmail
+from notifications.models import Notification
 from purchase_orders.models import PurchaseOrder, POItem
 from approvals.models import Approval
 from rfqs.models import RFQ, Quotation
@@ -71,6 +73,15 @@ class InvoiceTests(APITestCase):
     def test_invoice_requires_issued_po_and_copies_tax_parts(self):
         response = self.create_invoice()
         self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            ActivityLog.objects.filter(action='invoice_created').count(), 1
+        )
+        self.assertEqual(
+            Notification.objects.filter(
+                user=self.vendor_user, title='Invoice created'
+            ).count(),
+            1,
+        )
         invoice = Invoice.objects.get()
         self.assertEqual(invoice.cgst_amount + invoice.sgst_amount, invoice.tax_amount)
         self.assertEqual(response.data['grand_total'], Decimal('118.00'))
@@ -116,6 +127,15 @@ class InvoiceTests(APITestCase):
         self.assertEqual(paid.status_code, 200)
         self.assertEqual(paid.data['status'], 'paid')
         self.assertEqual(
+            ActivityLog.objects.filter(action='invoice_marked_paid').count(), 1
+        )
+        self.assertEqual(
+            Notification.objects.filter(
+                user=self.vendor_user, title='Invoice paid'
+            ).count(),
+            1,
+        )
+        self.assertEqual(
             self.client.post(
                 f'/api/invoices/{invoice_id}/mark-paid/'
             ).status_code,
@@ -155,6 +175,9 @@ class InvoiceTests(APITestCase):
         self.assertEqual(failed.status_code, 502)
         self.assertEqual(failed.data['status'], 'failed')
         self.assertEqual(InvoiceEmail.objects.filter(status='failed').count(), 1)
+        self.assertEqual(
+            ActivityLog.objects.filter(action='invoice_emailed').count(), 2
+        )
         with patch('invoices.views.EmailMessage.send', return_value=0):
             not_sent = self.client.post(
                 f'/api/invoices/{invoice_id}/send-email/',

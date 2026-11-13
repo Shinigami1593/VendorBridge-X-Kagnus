@@ -10,6 +10,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from activity.utils import log
 from .models import User
 from .serializers import RegisterSerializer, UserSerializer
 
@@ -21,6 +22,10 @@ def register(request):
     serializer = RegisterSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.save()
+    log(
+        user, 'auth', 'user_registered',
+        f'User registered - {user.email}', user,
+    )
     token, _ = Token.objects.get_or_create(user=user)
     return Response({'token': token.key, 'user': UserSerializer(user).data}, status=201)
 
